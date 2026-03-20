@@ -11,6 +11,8 @@
 > "When it rains in Koramangala, Ravi loses ₹700.
 > ShieldRide ensures that loss is covered before he even checks his phone."
 
+Demo of our application can be seen in this link: [Sheild-ride.vercel.app](https://sheild-ride.vercel.app/)
+
 ***
 
 ## Index
