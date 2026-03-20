@@ -1553,4 +1553,4 @@ If confirmed fraud → 50% advance flagged for recovery
 A worker who is genuinely stranded receives money within minutes - not the full amount, but enough to cover immediate needs - while verification completes. This is the parametric insurance equivalent of a provisional claim payment in traditional insurance, adapted for the micro-income context of a daily-wage gig worker.
 
 
-***
+*** 
