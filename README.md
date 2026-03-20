@@ -668,24 +668,19 @@ sequenceDiagram
 
     Note over IMD,Ravi: ⏱️ Target: Trigger → Payout in under 120 seconds
 
-    rect rgb(15, 52, 96)
         Note right of IMD: TRIGGER DETECTION
         IMD->>TE: Rainfall 28mm/hr in pincode 560034
         TE->>TE: Start duration timer
         TE->>TE: 60 min sustained → threshold confirmed
         TE->>DB: Log TriggerEvent
-    end
 
-    rect rgb(26, 26, 46)
         Note right of TE: ELIGIBLE RIDER IDENTIFICATION
         TE->>CS: TriggerEvent confirmed for BLK-BLR-047
         CS->>DB: Query riders assigned to affected store_ids
         DB-->>CS: Rider list (Ravi + 11 others)
         CS->>CS: Check: Active policy? Premium paid? No duplicate 48hr?
         CS-->>CS: Ravi passes all 3 pre-conditions ✓
-    end
 
-    rect rgb(22, 33, 62)
         Note right of CS: FRAUD CONFIDENCE SCORING
         CS->>FS: Score Ravi (rider_id, claim context)
         FS->>FS: Signal 1: GPS - 180m from store ✓
@@ -695,29 +690,22 @@ sequenceDiagram
         FS->>FS: Signal 5: Blinkit app active at 08:25 ✓
         FS->>FS: Signal 6: Store shows Closed ✓
         FS-->>CS: Fraud Score = 14/100 → AUTO-APPROVE
-    end
 
-    rect rgb(15, 52, 96)
         Note right of CS: RING DETECTION
         CS->>RD: Check store BLK-BLR-047 claim batch
         RD->>RD: Velocity 33% → normal
         RD->>RD: Co-claim history clear
         RD-->>CS: Ring Status = CLEAR ✓
-    end
 
-    rect rgb(26, 26, 46)
         Note right of CS: PAYOUT EXECUTION
         CS->>PO: Auto-Approve Ravi - ₹180
         PO->>RP: Initiate UPI credit ₹180
         RP-->>PO: Transaction confirmed
         PO->>DB: Log Claim CREDITED
-    end
 
-    rect rgb(22, 33, 62)
         Note right of PO: NOTIFICATION
         PO->>TW: Send WhatsApp to Ravi
         TW->>Ravi: ₹180 credited. No action needed.
-    end
 
     Note over IMD,Ravi: ✅ Total pipeline: 97 seconds
 ```
@@ -1361,21 +1349,17 @@ sequenceDiagram
     FS-->>CS: Fraud Score = 52 (GPS drift detected)
     Note over CS: Score 40–74 → SOFT HOLD
 
-    rect rgb(26, 26, 46)
         Note right of CS: PROVISIONAL 50% PAYOUT
         CS->>PO: Soft Hold - pay 50% immediately
         PO->>RP: UPI credit ₹125 (50% of ₹250)
         RP-->>PO: Transaction confirmed
         PO->>TW: Notify rider
         TW->>Rider: ₹125 credited. Remaining by review.
-    end
 
-    rect rgb(15, 52, 96)
         Note right of CS: HUMAN REVIEW (2hr SLA)
         CS->>RV: Push 6-signal report + platform data
         RV->>RV: Review GPS drift cause
         RV->>RV: Cross-check with network data
-    end
 
     alt Verified Genuine
         RV-->>CS: APPROVE remaining 50%
@@ -1553,4 +1537,4 @@ If confirmed fraud → 50% advance flagged for recovery
 A worker who is genuinely stranded receives money within minutes - not the full amount, but enough to cover immediate needs - while verification completes. This is the parametric insurance equivalent of a provisional claim payment in traditional insurance, adapted for the micro-income context of a daily-wage gig worker.
 
 
-*** 
+***
