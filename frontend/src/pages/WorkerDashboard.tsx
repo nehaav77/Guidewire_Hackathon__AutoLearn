@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ShieldCheck, ShieldAlert, CloudRain, Clock, TrendingUp, History, Zap, Home, LogOut } from 'lucide-react'
 import { riderApi, claimsApi, externalApi, sessionStore } from '../api'
 import type { RiderSession } from '../api'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 
 const TRIGGER_ICONS: Record<string, { icon: string; color: string }> = {
   'RAINFALL': { icon: '🌧️', color: '#3b82f6' },
@@ -33,6 +33,7 @@ export default function WorkerDashboard() {
   const [summary, setSummary] = useState<any>(null)
   const [weather, setWeather] = useState<any>(null)
   const [activeTab, setActiveTab] = useState('shield')
+  const [showToast, setShowToast] = useState(false)
 
   const currDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 
@@ -65,6 +66,11 @@ export default function WorkerDashboard() {
     externalApi.getWeather()
       .then(r => setWeather(r.data))
       .catch(() => setWeather(null))
+
+    // Simulate Rider Toast
+    const timer = setTimeout(() => setShowToast(true), 2500)
+    const cleanup = setTimeout(() => setShowToast(false), 9000)
+    return () => { clearTimeout(timer); clearTimeout(cleanup) }
   }, [riderId])
 
   const handleLogout = () => {
@@ -96,7 +102,20 @@ export default function WorkerDashboard() {
   return (
     <>
       <div className="ambient-bg" />
-      <div className="mobile-container" style={{ justifyContent: 'flex-start', paddingTop: '2rem', paddingBottom: '6rem' }}>
+      <div className="mobile-container" style={{ justifyContent: 'flex-start', paddingTop: '2rem', paddingBottom: '6rem', position: 'relative' }}>
+        {/* ─── Simulated Rider Toast ─── */}
+        <AnimatePresence>
+          {showToast && (
+            <motion.div initial={{ opacity: 0, y: -50, x: '-50%' }} animate={{ opacity: 1, y: 10, x: '-50%' }} exit={{ opacity: 0, y: -50, x: '-50%' }}
+              style={{ position: 'fixed', top: 0, left: '50%', zIndex: 100, background: 'rgba(239, 68, 68, 0.15)', backdropFilter: 'blur(10px)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '0.75rem 1.25rem', borderRadius: 50, display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.5)', width: 'max-content', maxWidth: '90%' }}>
+              <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+              <div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#ef4444' }}>Severe Disruption Alert</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Heavy rainfall + AQI triggering payouts</div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* ─── Header ─── */}
         <div className="dash-header">
@@ -179,14 +198,31 @@ export default function WorkerDashboard() {
             )}
 
             {/* Live Triggers */}
-            <div className="surface-subtle" style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem' }}>
-              <Zap size={18} color="var(--accent-warning)" />
-              <div>
-                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>Live Triggers</div>
-                <div className="text-xs">No active disruptions in your zone</div>
+            <div className="surface-subtle" style={{ marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <Zap size={18} color="var(--accent-warning)" />
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>Live Triggers</div>
+                  <div className="text-xs" style={{ color: 'var(--accent-warning)' }}>3 active disruptions in your zone</div>
+                </div>
+                <div style={{ marginLeft: 'auto' }}>
+                  <span className="status-dot orange" style={{ animation: 'none', width: 10, height: 10 }} />
+                </div>
               </div>
-              <div style={{ marginLeft: 'auto' }}>
-                <span className="status-dot green" style={{ animation: 'none', width: 10, height: 10 }} />
+              <div style={{ padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                 {[
+                   { icon: '🌧️', label: 'Severe Rainfall (28mm/hr)', time: 'Active since 08:30 AM', color: '#3b82f6' },
+                   { icon: '💨', label: 'AQI Spike (420+)', time: 'Active since 10:15 AM', color: '#a855f7' },
+                   { icon: '🏪', label: 'Store Congestion Auto-Hold', time: 'Under investigation', color: '#f59e0b' }
+                 ].map((t,i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                       <span style={{ fontSize: '1.3rem'}}>{t.icon}</span>
+                       <div>
+                         <div style={{ fontSize: '0.85rem', fontWeight: 600, color: t.color }}>{t.label}</div>
+                         <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{t.time}</div>
+                       </div>
+                    </div>
+                 ))}
               </div>
             </div>
           </motion.div>
@@ -198,6 +234,28 @@ export default function WorkerDashboard() {
             <h3 className="heading-md" style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: 8 }}>
               <History size={18} color="var(--text-muted)" /> Claims History
             </h3>
+
+            {/* This Week's Protection Summary (UX Cohort Retention Feature) */}
+            {summary && claims.length > 0 && (
+              <div className="surface-subtle" style={{ padding: '1rem', marginBottom: '1.25rem', border: '1px solid rgba(16,185,129,0.2)', position: 'relative', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, width: 4, height: '100%', background: 'var(--accent-primary)' }} />
+                <h4 style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <ShieldCheck size={16} color="var(--accent-primary)" /> This Week's Protection Summary
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.85rem' }}>
+                  <div style={{ color: 'var(--text-muted)' }}>Total Protected</div>
+                  <div style={{ textAlign: 'right', fontWeight: 600 }}>₹{summary.total_protected} ✓</div>
+                  <div style={{ color: 'var(--text-muted)' }}>Weekly Premium Paid</div>
+                  <div style={{ textAlign: 'right', fontWeight: 600 }}>₹{summary.weekly_premium}</div>
+                  <div style={{ gridColumn: 'span 2', height: 1, background: 'rgba(255,255,255,0.1)', margin: '0.25rem 0' }} />
+                  <div style={{ fontWeight: 700 }}>Net Benefit Delivered</div>
+                  <div style={{ textAlign: 'right', fontWeight: 800, color: summary.net_benefit > 0 ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
+                    {summary.net_benefit > 0 ? '+' : ''}₹{summary.net_benefit}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {claims.length === 0 ? (
               <div className="surface-subtle text-center" style={{ padding: '2rem' }}>
                 <p className="text-sm">No claims yet. Your shield is watching for disruptions.</p>

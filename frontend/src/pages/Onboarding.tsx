@@ -97,25 +97,120 @@ export default function Onboarding() {
   const [step, setStep] = useState(1)
   const totalSteps = 5
   const [loading, setLoading] = useState(false)
-  const [selectedStore, setSelectedStore] = useState(STORES[0])
+  
+  const [stores, setStores] = useState<any[]>(STORES)
+  const [selectedStore, setSelectedStore] = useState<any>(STORES[0])
   const [showStoreList, setShowStoreList] = useState(false)
+  const [locationStatus, setLocationStatus] = useState<string>('Detecting location...')
+
   const [selectedTier, setSelectedTier] = useState<(typeof TIERS[0] & { premium?: number }) | null>(null)
   const [pricingBreakdown, setPricingBreakdown] = useState<any>(null)
   const [selectedLang, setSelectedLang] = useState('en')
+
+  // -- GPS Fetching --
+  useEffect(() => {
+    if (step === 1) {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            setLocationStatus('Location found. Fetching nearest hubs...')
+            try {
+               const res = await riderApi.getNearestHubs({
+                 latitude: position.coords.latitude,
+                 longitude: position.coords.longitude
+               })
+               if (res.data && res.data.length > 0) {
+                 const formattedStores = res.data.map((s:any) => ({
+                    id: s.store_id,
+                    name: s.zone,
+                    distance: `${s.distance_km} km`,
+                    risk: s.distance_km < 5 ? 'HIGH' : 'MODERATE',
+                    zrm: s.distance_km < 5 ? 1.3 : 1.0
+                 }))
+                 setStores(formattedStores)
+                 setSelectedStore(formattedStores[0])
+                 setLocationStatus('')
+               } else {
+                 setLocationStatus('No hubs found near you. Using defaults.')
+               }
+            } catch (err) {
+               setLocationStatus('Failed to fetch local hubs. Using defaults.')
+            }
+          },
+          () => {
+            setLocationStatus('Location access denied. Using defaults.')
+          }
+        )
+      } else {
+        setLocationStatus('Geolocation not supported. Using defaults.')
+      }
+    }
+  }, [step])
+
+  // -- Text to Speech Policy --
+  const speakPolicy = () => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel()
+      const content = POLICY_TEXT[selectedLang] || POLICY_TEXT.en
+      const textToSpeak = `${content.what.title}. ${content.what.body} ${content.how.title}. ${content.how.body} ${content.rights.title}. ${content.rights.body}`
+      const utterance = new SpeechSynthesisUtterance(textToSpeak)
+      
+      const langMapping: Record<string, string> = {
+          en: 'en', kn: 'kn-IN', hi: 'hi-IN', ta: 'ta-IN', te: 'te-IN'
+      }
+      const targetLang = langMapping[selectedLang] || 'en'
+      utterance.lang = targetLang // Explicit fallback for browser models
+      
+      const setVoiceAndSpeak = () => {
+        const voices = window.speechSynthesis.getVoices()
+        const voice = voices.find(v => v.lang.startsWith(targetLang) || v.lang.startsWith(targetLang.split('-')[0]))
+        if (voice) {
+          utterance.voice = voice
+        } else if (selectedLang !== 'en') {
+           // If language is deeply unsupported on this OS, fall back to Google Translate TTS audio wrapper
+           const url = `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(textToSpeak.slice(0, 190))}&tl=${targetLang}&client=tw-ob`
+           const audio = new Audio(url)
+           audio.play().catch(() => window.speechSynthesis.speak(utterance))
+           return
+        }
+        window.speechSynthesis.speak(utterance)
+      }
+
+      if (window.speechSynthesis.getVoices().length === 0) {
+        window.speechSynthesis.onvoiceschanged = setVoiceAndSpeak
+      } else {
+        setVoiceAndSpeak()
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (step === 2) {
+      speakPolicy()
+    }
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel()
+      }
+    }
+  }, [step, selectedLang])
 
   const currentMonth = new Date().getMonth() + 1
   const si = SEASONAL_INDEX[currentMonth]
   const BASE_RATE = 50
   const WTF = 1.0
+  const DISCOUNT = 0.95 // 5% discount for zero claims
 
   useEffect(() => {
     const tierPrices = TIERS.map(t => {
-      const premium = Math.round(BASE_RATE * selectedStore.zrm * WTF * si.value * t.ctm * 100) / 100
-      return { ...t, premium }
+      const basePremium = BASE_RATE * selectedStore.zrm * WTF * si.value * t.ctm
+      const premium = Math.round(basePremium * DISCOUNT * 100) / 100
+      return { ...t, premium, old_premium: Math.round(basePremium * 100) / 100 }
     })
     setPricingBreakdown({
       base: BASE_RATE, zrm: selectedStore.zrm, wtf: WTF, si: si.value,
-      si_label: si.label, zone: selectedStore.name, tiers: tierPrices
+      si_label: si.label, zone: selectedStore.name, tiers: tierPrices,
+      discount: DISCOUNT
     })
   }, [selectedStore])
 
@@ -231,6 +326,7 @@ export default function Onboarding() {
                       Zone Risk Multiplier: <span className="font-mono font-bold" style={{ color: 'var(--accent-primary)' }}>{selectedStore.zrm}×</span>
                     </div>
                   </div>
+                  {locationStatus && <p className="text-xs" style={{ marginBottom: '1rem', color: 'var(--accent-warning)', textAlign: 'center' }}>{locationStatus}</p>}
                   <div style={{ display: 'flex', gap: '0.75rem' }}>
                     <button className="btn btn-secondary" onClick={() => setShowStoreList(true)} style={{ flex: 1 }}>Change</button>
                     <button className="btn btn-primary" onClick={handleConfirmStore} disabled={loading} style={{ flex: 2 }} id="confirm-store-btn">
@@ -241,7 +337,7 @@ export default function Onboarding() {
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <p className="text-sm" style={{ marginBottom: '0.5rem' }}>Select your delivery hub:</p>
-                  {STORES.map(s => (
+                  {stores.map(s => (
                     <div key={s.id} className={`tier-card ${selectedStore.id === s.id ? 'active' : ''}`}
                       style={{ padding: '1rem', marginBottom: 0 }}
                       onClick={() => { setSelectedStore(s); setShowStoreList(false) }}>
@@ -361,7 +457,11 @@ export default function Onboarding() {
                       <div className="tier-desc">₹{t.cover}/day protected</div>
                     </div>
                   </div>
-                  <div className="tier-price"><div className="amount">₹{t.premium}</div><div className="period">/week</div></div>
+                  <div className="tier-price">
+                    {t.old_premium !== t.premium && <div className="text-xs" style={{ textDecoration: 'line-through', color: 'var(--text-muted)' }}>₹{t.old_premium}</div>}
+                    <div className="amount">₹{t.premium}</div>
+                    <div className="period">/week</div>
+                  </div>
                 </div>
               ))}
             </motion.div>
@@ -394,6 +494,10 @@ export default function Onboarding() {
                 <div className="pricing-step"><span className="label">× Tenure Factor</span><span className="multiplier">{pricingBreakdown.wtf}×</span></div>
                 <div className="pricing-step"><span className="label">× Seasonal Index</span><span className="multiplier">{pricingBreakdown.si}×</span></div>
                 <div className="pricing-step"><span className="label">× Coverage Tier</span><span className="multiplier">{selectedTier.ctm}×</span></div>
+                <div className="pricing-step" style={{ background: 'rgba(16,185,129,0.1)', padding: '0.4rem', borderRadius: 6, margin: '0.2rem 0' }}>
+                   <span className="label" style={{ color: '#10b981', fontWeight: 700 }}>Zero Claims Discount</span>
+                   <span className="multiplier" style={{ color: '#10b981' }}>- 5%</span>
+                </div>
                 <div className="pricing-total">
                   <span style={{ fontWeight: 700 }}>Weekly Premium</span>
                   <span style={{ fontWeight: 900, fontSize: '1.25rem', color: 'var(--accent-primary)' }}>

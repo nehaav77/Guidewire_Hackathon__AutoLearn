@@ -147,3 +147,15 @@ class InsurerStats(BaseModel):
     fraud_prevented_amount: float
     reserve_recommended: float
     reserve_current: float
+
+# ─── Location & Nearest Hub Models ───
+
+class LocationRequest(BaseModel):
+    latitude: float
+    longitude: float
+
+class NearestHubResponse(BaseModel):
+    store_id: str
+    zone: str
+    distance_km: float
+    availability: str

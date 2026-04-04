@@ -1,11 +1,28 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Shield, Bike, BarChart3, ArrowRight, Lock, Phone, Mail, Eye, EyeOff, User } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { authApi, sessionStore } from '../api'
+import { authApi, riderApi, sessionStore } from '../api'
 
 export default function LandingPage() {
   const navigate = useNavigate()
+  
+  // Auto-redirect if already logged in (Persistent Session)
+  useEffect(() => {
+    const session = sessionStore.get();
+    if (session) {
+      if (session.role === 'rider') {
+        if (session.has_active_policy) {
+          navigate('/dashboard');
+        } else {
+          navigate('/onboarding');
+        }
+      } else if (session.role === 'insurer') {
+        navigate('/insurer');
+      }
+    }
+  }, [navigate]);
+
   const [showLogin, setShowLogin] = useState(false)
   const [loginRole, setLoginRole] = useState<'rider' | 'insurer'>('rider')
   const [riderMode, setRiderMode] = useState<'signin' | 'signup'>('signin')
@@ -28,11 +45,40 @@ export default function LandingPage() {
     if (!riderName.trim() || riderName.trim().length < 2) { setError('Please enter your full name'); return }
     setLoading(true)
     setError('')
+
+    const getStoreLocation = (): Promise<string> => {
+      return new Promise((resolve) => {
+        if (!navigator.geolocation) {
+          resolve('BLK-BLR-047')
+          return
+        }
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            try {
+              const res = await riderApi.getNearestHubs({
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude
+              })
+              if (res.data && res.data.length > 0) {
+                resolve(res.data[0].store_id)
+              } else {
+                resolve('BLK-BLR-047')
+              }
+            } catch {
+              resolve('BLK-BLR-047')
+            }
+          },
+          () => resolve('BLK-BLR-047')
+        )
+      })
+    }
+
     try {
+      const nearestStoreId = await getStoreLocation()
       const res = await authApi.signup({
         name: riderName.trim(),
         mobile_number: mobile,
-        assigned_store_id: 'BLK-BLR-047' // Will be updated during onboarding
+        assigned_store_id: nearestStoreId
       })
       // Save session
       sessionStore.save({

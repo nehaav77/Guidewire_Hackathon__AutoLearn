@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
+    ENVIRONMENT: str = "development"
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "ShieldRide AI-Powered Insurance API"
     SECRET_KEY: str = "changeme"

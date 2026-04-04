@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Activity, MapPin, TrendingUp, ShieldAlert, Cpu, PieChart, Zap, Users, LogOut } from 'lucide-react'
 import { claimsApi, sessionStore } from '../api'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 
 const TRIGGER_TYPES = [
   { id: 'RAINFALL', label: 'Extreme Rainfall', icon: '🌧️', unit: 'mm/hr', defaultIntensity: 28, source: 'IMD API' },
@@ -17,6 +17,7 @@ export default function InsurerDashboard() {
   const session = sessionStore.get()
   const [stats, setStats] = useState<any>(null)
   const [activePanel, setActivePanel] = useState('overview')
+  const [showToast, setShowToast] = useState(false)
   
   // Redirect riders away from insurer dashboard
   useEffect(() => {
@@ -40,9 +41,21 @@ export default function InsurerDashboard() {
   }
 
   useEffect(() => {
-    claimsApi.getInsurerStats()
-      .then(r => setStats(r.data))
-      .catch(() => setStats(DEFAULT_STATS))
+    // Simulate new rider signup 2.5 seconds after mounting
+    const timer = setTimeout(() => setShowToast(true), 2500)
+    const cleanup = setTimeout(() => setShowToast(false), 8000)
+    return () => { clearTimeout(timer); clearTimeout(cleanup) }
+  }, [])
+
+  useEffect(() => {
+    const fetchStats = () => {
+      claimsApi.getInsurerStats()
+        .then(r => setStats(r.data))
+        .catch(() => setStats((prev: any) => prev || DEFAULT_STATS))
+    }
+    fetchStats()
+    const interval = setInterval(fetchStats, 5000)
+    return () => clearInterval(interval)
   }, [])
 
   const handleSimulate = async () => {
@@ -72,6 +85,19 @@ export default function InsurerDashboard() {
 
   return (
     <div className="page-wrapper" style={{ background: 'var(--bg-space)' }}>
+      {/* ─── Simulated Live Toast ─── */}
+      <AnimatePresence>
+        {showToast && (
+          <motion.div initial={{ opacity: 0, x: 100 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 100 }}
+            style={{ position: 'fixed', top: 24, right: 24, zIndex: 9999, background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', padding: '1rem 1.5rem', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 14, boxShadow: '0 10px 30px rgba(16,185,129,0.4)', color: 'white' }}>
+            <div style={{ background: 'white', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>⚡</div>
+            <div>
+              <div style={{ fontSize: '1.05rem', fontWeight: 800 }}>New Rider Registered!</div>
+              <div style={{ fontSize: '0.85rem', opacity: 0.9 }}>+1 Active Policy (BLK-BLR-047)</div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ─── Top Nav Bar ─── */}
       <div className="insurer-nav">
@@ -584,6 +610,76 @@ export default function InsurerDashboard() {
                     <div className={`metric-delta ${kpi.positive ? 'positive' : 'neutral'}`}>{kpi.delta}</div>
                   </div>
                 ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ═══════════════════════════════════════
+           RESERVES PANEL
+           ═══════════════════════════════════════ */}
+        {activePanel === 'reserves' && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <div className="insurer-grid" style={{ display: 'block' }}>
+              <div className="glass-card-static" style={{ marginBottom: '1.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+                  <div>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <Cpu size={24} color="var(--accent-primary)" />
+                      Next 7 Days - Predicted Claim Exposure
+                    </h2>
+                    <p className="text-sm" style={{ color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+                      Based on IMD 7-day forecast combined with historical claim frequency per zone
+                    </p>
+                  </div>
+                  <div style={{ textAlign: 'right', background: 'rgba(16,185,129,0.1)', padding: '1rem 1.5rem', borderRadius: '12px', border: '1px solid rgba(16,185,129,0.2)' }}>
+                    <div className="text-sm font-bold" style={{ color: 'var(--accent-primary)' }}>Total Recommended Reserve</div>
+                    <div style={{ fontSize: '2rem', fontWeight: 800, color: '#10b981' }}>
+                      ₹{stats.reserve_recommended.toLocaleString()}
+                    </div>
+                    <div className="text-xs" style={{ color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                      Current Liquidity: ₹{stats.reserve_current.toLocaleString()} ✓
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <th style={{ padding: '1rem', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>Zone (Dark Store)</th>
+                        <th style={{ padding: '1rem', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>Weather Probability</th>
+                        <th style={{ padding: '1rem', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>Predicted Event Volume</th>
+                        <th style={{ padding: '1rem', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600, textAlign: 'right' }}>Recommended Reserve</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stats.zone_reserves.map((z: any, idx: number) => (
+                        <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                          <td style={{ padding: '1rem' }}>
+                            <div className="font-bold">{z.zone}</div>
+                            <div className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{z.store_id}</div>
+                          </td>
+                          <td style={{ padding: '1rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <span style={{ fontSize: '1.2rem' }}>{z.rainfall_prob > 70 ? '🔴' : z.rainfall_prob > 40 ? '🟡' : '🟢'}</span>
+                              <span className="font-bold">{z.rainfall_prob}%</span>
+                              <span className="text-xs">Rainfall</span>
+                            </div>
+                          </td>
+                          <td style={{ padding: '1rem' }}>
+                            <span className="font-mono font-bold" style={{ background: 'rgba(255,255,255,0.05)', padding: '0.25rem 0.5rem', borderRadius: '4px' }}>
+                              {z.predicted_claims} claims
+                            </span>
+                          </td>
+                          <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 800, color: z.risk_color }}>
+                            ₹{z.reserve.toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </motion.div>

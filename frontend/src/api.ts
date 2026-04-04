@@ -76,6 +76,8 @@ export const riderApi = {
     api.post('/riders/calculate-premium', data),
   getPricingZones: () =>
     api.get('/riders/pricing/zones'),
+  getNearestHubs: (data: { latitude: number; longitude: number }) =>
+    api.post('/riders/hubs/nearest', data),
 };
 
 export const claimsApi = {

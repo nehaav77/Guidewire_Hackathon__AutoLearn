@@ -8,12 +8,14 @@ ShieldRide Riders & Auth Router
 from fastapi import APIRouter, HTTPException
 from models.domain import (
     RiderCreate, Rider, PolicyCreate, Policy,
-    LoginRequest, LoginResponse, PremiumRequest
+    LoginRequest, LoginResponse, PremiumRequest,
+    LocationRequest, NearestHubResponse
 )
 import database as db
 from services.pricing_engine import calculate_premium, get_all_zones, COVERAGE_TIERS
 import uuid
 import datetime
+import math
 
 router = APIRouter()
 
@@ -64,6 +66,53 @@ async def rider_signup(data: RiderCreate):
         "mobile_number": new_rider.mobile_number,
         "assigned_store_id": new_rider.assigned_store_id
     }
+
+
+# ═══════════════════════════════════════════════
+# LOCAL HUBS BY GPS
+# ═══════════════════════════════════════════════
+
+def haversine(lat1, lon1, lat2, lon2):
+    R = 6371.0 # Earth radius in kilometers
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
+
+# Mock coordinates for Bengaluru hubs
+HUB_COORDS = {
+    "BLK-BLR-047": (12.9279, 77.6271), # Koramangala
+    "BLK-BLR-061": (12.9304, 77.6784), # Bellandur
+    "BLK-BLR-033": (12.9784, 77.6408), # Indiranagar
+    "BLK-BLR-089": (12.9698, 77.7499), # Whitefield
+    "BLK-BLR-092": (12.9800, 77.6400), # Indiranagar 100ft
+}
+
+@router.post("/hubs/nearest", response_model=list[NearestHubResponse])
+async def get_nearest_hubs(location: LocationRequest):
+    """
+    Returns nearest dark stores based on rider's GPS location.
+    """
+    stores = await db.dark_stores_collection.find({}).to_list(length=50)
+    if not stores:
+        stores = db.DEMO_DARK_STORES
+
+    results = []
+    for store in stores:
+        store_id = store["store_id"]
+        coords = HUB_COORDS.get(store_id, (12.9716, 77.5946)) # Default Bangalore center
+        dist = haversine(location.latitude, location.longitude, coords[0], coords[1])
+        results.append(NearestHubResponse(
+            store_id=store_id,
+            zone=store["zone"],
+            distance_km=round(dist, 1),
+            availability=store.get("availability", "Open")
+        ))
+    
+    # Sort by distance
+    results.sort(key=lambda x: x.distance_km)
+    return results
 
 
 # ═══════════════════════════════════════════════

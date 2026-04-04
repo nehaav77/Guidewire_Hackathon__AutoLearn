@@ -22,69 +22,27 @@ router = APIRouter()
 @router.get("/weather")
 async def get_weather(lat: float = 12.9716, lon: float = 77.5946):
     """
-    Fetches real-time weather for Bengaluru using OpenWeatherMap.
-    Acts as a proxy for IMD data. Requires OWM_API_KEY in .env
-    
-    Returns temperature, humidity, rainfall, wind, and trigger assessment.
+    Mocked weather API.
     """
-    if not settings.OWM_API_KEY:
-        return {
-            "source": "OpenWeatherMap",
-            "status": "API_KEY_NOT_CONFIGURED",
-            "message": "Set OWM_API_KEY in backend/.env to enable real weather data",
-            "instructions": "1. Sign up at https://openweathermap.org/api  2. Get API key (free tier)  3. Add OWM_API_KEY=your_key to .env",
-            "fallback_data": {
-                "temperature_celsius": 32.5,
-                "humidity_percent": 68,
-                "rainfall_mm_per_hr": 0,
-                "wind_speed_kmh": 12.4,
-                "description": "Partly cloudy"
-            }
-        }
-
-    url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={settings.OWM_API_KEY}&units=metric"
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(url)
-            if response.status_code != 200:
-                raise HTTPException(status_code=response.status_code, detail="OWM API error")
-
-            data = response.json()
-            temp = data.get("main", {}).get("temp", 0)
-            humidity = data.get("main", {}).get("humidity", 0)
-            rain_1h = data.get("rain", {}).get("1h", 0)
-            wind_speed = data.get("wind", {}).get("speed", 0) * 3.6  # m/s to km/h
-
-            # WBGT Heat Index approximation
-            # Simplified Steadman formula: HI ≈ T + 0.33 * (H * 6.105 * exp(17.27*T/(237.7+T)) / 100) - 4
-            wbgt_approx = round(0.567 * temp + 0.393 * (humidity / 100 * 6.105 * 2.718 ** (17.27 * temp / (237.7 + temp))) + 3.94, 1)
-
-            # Trigger assessment
-            rainfall_trigger = rain_1h > 20  # >20mm/hr
-            heat_trigger = wbgt_approx > 44  # >44°C WBGT
-
-            return {
-                "source": "OpenWeatherMap (LIVE)",
-                "location": data.get("name", "Bengaluru"),
-                "timestamp": datetime.datetime.utcnow().isoformat(),
-                "temperature_celsius": temp,
-                "humidity_percent": humidity,
-                "rainfall_mm_per_hr": rain_1h,
-                "wind_speed_kmh": round(wind_speed, 1),
-                "wbgt_heat_index": wbgt_approx,
-                "description": data.get("weather", [{}])[0].get("description", ""),
-                "trigger_assessment": {
-                    "rainfall_trigger": rainfall_trigger,
-                    "heat_trigger": heat_trigger,
-                    "rainfall_threshold": "20 mm/hr for 60 min",
-                    "heat_threshold": "44°C WBGT for 2 hrs"
-                },
-                "icon": data.get("weather", [{}])[0].get("icon", ""),
-                "raw_data": data
-            }
-    except httpx.RequestError as e:
-        logger.error(f"OWM request failed: {e}")
-        raise HTTPException(status_code=503, detail=f"Weather API unreachable: {str(e)}")
+    return {
+        "source": "OpenWeatherMap (MOCKED)",
+        "location": "Bengaluru",
+        "timestamp": datetime.datetime.utcnow().isoformat(),
+        "temperature_celsius": 32.5,
+        "humidity_percent": 68,
+        "rainfall_mm_per_hr": 0,
+        "wind_speed_kmh": 12.4,
+        "wbgt_heat_index": 35.8,
+        "description": "Partly cloudy",
+        "trigger_assessment": {
+            "rainfall_trigger": False,
+            "heat_trigger": False,
+            "rainfall_threshold": "20 mm/hr for 60 min",
+            "heat_threshold": "44°C WBGT for 2 hrs"
+        },
+        "icon": "02d",
+        "raw_data": {}
+    }
 
 
 # ---------------------------------------------------------
@@ -93,35 +51,20 @@ async def get_weather(lat: float = 12.9716, lon: float = 77.5946):
 @router.get("/aqi")
 async def get_aqi(lat: float = 12.9716, lon: float = 77.5946):
     """
-    Fetches real-time Air Quality Index via Open-Meteo (free, no API key).
-    Acts as a proxy for CPCB ground station data.
+    Mocked AQI API.
     """
-    url = f"https://air-quality-api.open-meteo.com/v1/air-quality?latitude={lat}&longitude={lon}&current=european_aqi,pm10,pm2_5"
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(url)
-            if response.status_code != 200:
-                raise HTTPException(status_code=response.status_code, detail="AQI API error")
-
-            data = response.json()
-            current = data.get("current", {})
-            aqi = current.get("european_aqi", 0)
-
-            return {
-                "source": "Open-Meteo (CPCB proxy) — LIVE",
-                "timestamp": datetime.datetime.utcnow().isoformat(),
-                "aqi": aqi,
-                "pm10": current.get("pm10"),
-                "pm2_5": current.get("pm2_5"),
-                "threshold_exceeded": aqi > 400,
-                "trigger_assessment": {
-                    "aqi_trigger": aqi > 400,
-                    "threshold": "AQI > 400 (Severe category) for 4 hours"
-                }
-            }
-    except httpx.RequestError as e:
-        logger.error(f"AQI request failed: {e}")
-        raise HTTPException(status_code=503, detail=f"AQI API unreachable: {str(e)}")
+    return {
+        "source": "Open-Meteo (MOCKED)",
+        "timestamp": datetime.datetime.utcnow().isoformat(),
+        "aqi": 155,
+        "pm10": 80,
+        "pm2_5": 45,
+        "threshold_exceeded": False,
+        "trigger_assessment": {
+            "aqi_trigger": False,
+            "threshold": "AQI > 400 (Severe category) for 4 hours"
+        }
+    }
 
 
 # ---------------------------------------------------------
