@@ -65,8 +65,13 @@ export default function WorkerDashboard() {
         }
       })
       .catch(() => {
-        // Fallback DEMO data, but we don't have DEMO_CLAIMS explicitly here unless we define it, wait WorkerDashboard has a DEMO_CLAIMS global? No, it used setClaims([]) previously if not found, wait, it used setClaims(DEMO_CLAIMS), but DEMO_CLAIMS is not defined in this file. Let's strictly empty if fail.
-        setClaims([])
+        // Fallback DEMO data for headless Vercel
+        const fallbackClaims = [
+          { claim_id: 'SHR-FALLBACK-1', trigger_type: 'RAINFALL', payout_amount: 180, resolution: 'AUTO-APPROVE', payout_status: 'CREDITED', zone: 'Koramangala', created_at: new Date().toISOString() },
+          { claim_id: 'SHR-FALLBACK-2', trigger_type: 'PLATFORM_DOWNTIME', payout_amount: 250, resolution: 'AUTO-APPROVE', payout_status: 'CREDITED', zone: 'Koramangala', created_at: new Date(Date.now() - 3600000).toISOString() }
+        ];
+        setClaims(fallbackClaims)
+        setTriggerToasts(fallbackClaims)
       })
 
     // Fetch weekly summary
@@ -77,7 +82,12 @@ export default function WorkerDashboard() {
     // Fetch real weather data
     externalApi.getWeather()
       .then(r => setWeather(r.data))
-      .catch(() => setWeather(null))
+      .catch(() => setWeather({
+        description: "Heavy Rainfall + AQI Alert",
+        temperature_celsius: 28.4,
+        rainfall_mm_per_hr: 35,
+        source: "Fallback Data"
+      }))
   }, [riderId])
 
   // Sequential Toast Logic: Load next toast

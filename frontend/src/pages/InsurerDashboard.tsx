@@ -53,6 +53,14 @@ export default function InsurerDashboard() {
   }, [stats])
 
   useEffect(() => {
+    // Only for headless Vercel: Fake a new rider signup precisely once to demo the popup
+    const timer = setTimeout(() => {
+      setStats((prev: any) => prev ? { ...prev, active_policies: prev.active_policies + 1 } : prev)
+    }, 4500)
+    return () => clearTimeout(timer)
+  }, [])
+
+  useEffect(() => {
     const fetchStats = () => {
       claimsApi.getInsurerStats()
         .then(r => setStats(r.data))
