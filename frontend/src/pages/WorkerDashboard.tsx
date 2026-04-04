@@ -395,10 +395,3 @@ export default function WorkerDashboard() {
     </>
   )
 }
-
-const DEMO_CLAIMS = [
-  { claim_id: 'SHR-2026-A7F3B', trigger_type: 'RAINFALL', payout_amount: 180, resolution: 'AUTO-APPROVE', fraud_score: 14, payout_status: 'CREDITED', zone: 'Koramangala', created_at: new Date(Date.now() - 2 * 86400000).toISOString() },
-  { claim_id: 'SHR-2026-B9E2C', trigger_type: 'HEAT_INDEX', payout_amount: 150, resolution: 'AUTO-APPROVE', fraud_score: 18, payout_status: 'CREDITED', zone: 'Koramangala', created_at: new Date(Date.now() - 5 * 86400000).toISOString() },
-  { claim_id: 'SHR-2026-C4D1A', trigger_type: 'PLATFORM_DOWNTIME', payout_amount: 250, resolution: 'AUTO-APPROVE', fraud_score: 8, payout_status: 'CREDITED', zone: 'Koramangala', created_at: new Date(Date.now() - 8 * 86400000).toISOString() },
-  { claim_id: 'SHR-2026-D2F5E', trigger_type: 'INTERNET_SHUTDOWN', payout_amount: 125, resolution: 'SOFT_HOLD', fraud_score: 52, payout_status: 'PROCESSING', zone: 'Koramangala', created_at: new Date(Date.now() - 12 * 86400000).toISOString() },
-]
