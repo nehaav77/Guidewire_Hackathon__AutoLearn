@@ -33,7 +33,10 @@ export default function WorkerDashboard() {
   const [summary, setSummary] = useState<any>(null)
   const [weather, setWeather] = useState<any>(null)
   const [activeTab, setActiveTab] = useState('shield')
-  const [showToast, setShowToast] = useState(false)
+  
+  // Real-time toast queue for triggers
+  const [triggerToasts, setTriggerToasts] = useState<any[]>([])
+  const [activeToast, setActiveToast] = useState<any>(null)
 
   const currDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 
@@ -52,10 +55,19 @@ export default function WorkerDashboard() {
         })
       })
 
-    // Fetch claims
+    // Fetch claims and queue recent toasts!
     claimsApi.getHistory(riderId)
-      .then(r => setClaims(Array.isArray(r.data) ? r.data : []))
-      .catch(() => setClaims(DEMO_CLAIMS))
+      .then(r => {
+        const fetchedClaims = Array.isArray(r.data) ? r.data : []
+        setClaims(fetchedClaims)
+        if (fetchedClaims.length > 0) {
+          setTriggerToasts(fetchedClaims.filter((c: any) => c.payout_amount > 0).slice(0, 3))
+        }
+      })
+      .catch(() => {
+        // Fallback DEMO data, but we don't have DEMO_CLAIMS explicitly here unless we define it, wait WorkerDashboard has a DEMO_CLAIMS global? No, it used setClaims([]) previously if not found, wait, it used setClaims(DEMO_CLAIMS), but DEMO_CLAIMS is not defined in this file. Let's strictly empty if fail.
+        setClaims([])
+      })
 
     // Fetch weekly summary
     claimsApi.getWeeklySummary(riderId)
@@ -66,12 +78,25 @@ export default function WorkerDashboard() {
     externalApi.getWeather()
       .then(r => setWeather(r.data))
       .catch(() => setWeather(null))
-
-    // Simulate Rider Toast
-    const timer = setTimeout(() => setShowToast(true), 2500)
-    const cleanup = setTimeout(() => setShowToast(false), 9000)
-    return () => { clearTimeout(timer); clearTimeout(cleanup) }
   }, [riderId])
+
+  // Sequential Toast Logic: Load next toast
+  useEffect(() => {
+    if (triggerToasts.length > 0 && !activeToast) {
+      setActiveToast(triggerToasts[0])
+    }
+  }, [triggerToasts, activeToast])
+
+  // Sequential Toast Logic: Trigger timer for active toast
+  useEffect(() => {
+    if (activeToast) {
+      const timer = setTimeout(() => {
+        setActiveToast(null)
+        setTriggerToasts(prev => prev.slice(1))
+      }, 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [activeToast])
 
   const handleLogout = () => {
     sessionStore.clear()
@@ -103,15 +128,15 @@ export default function WorkerDashboard() {
     <>
       <div className="ambient-bg" />
       <div className="mobile-container" style={{ justifyContent: 'flex-start', paddingTop: '2rem', paddingBottom: '6rem', position: 'relative' }}>
-        {/* ─── Simulated Rider Toast ─── */}
-        <AnimatePresence>
-          {showToast && (
-            <motion.div initial={{ opacity: 0, y: -50, x: '-50%' }} animate={{ opacity: 1, y: 10, x: '-50%' }} exit={{ opacity: 0, y: -50, x: '-50%' }}
-              style={{ position: 'fixed', top: 0, left: '50%', zIndex: 100, background: 'rgba(239, 68, 68, 0.15)', backdropFilter: 'blur(10px)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '0.75rem 1.25rem', borderRadius: 50, display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.5)', width: 'max-content', maxWidth: '90%' }}>
-              <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+        {/* ─── Sequenced Trigger Toasts ─── */}
+        <AnimatePresence mode="popLayout">
+          {activeToast && (
+            <motion.div key={activeToast.claim_id} initial={{ opacity: 0, y: -50, x: '-50%' }} animate={{ opacity: 1, y: 10, x: '-50%' }} exit={{ opacity: 0, scale: 0.9, x: '-50%' }}
+              style={{ position: 'fixed', top: 0, left: '50%', zIndex: 100, background: 'rgba(16, 185, 129, 0.15)', backdropFilter: 'blur(10px)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '0.75rem 1.25rem', borderRadius: 50, display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.5)', width: 'max-content', maxWidth: '90%' }}>
+              <span style={{ fontSize: '1.2rem' }}>{TRIGGER_ICONS[activeToast.trigger_type]?.icon || '⚠️'}</span>
               <div>
-                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#ef4444' }}>Severe Disruption Alert</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Heavy rainfall + AQI triggering payouts</div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#10b981' }}>{activeToast.trigger_type?.replace(/_/g, ' ')} Detected</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-primary)' }}>₹{activeToast.payout_amount} uniquely credited to your account!</div>
               </div>
             </motion.div>
           )}

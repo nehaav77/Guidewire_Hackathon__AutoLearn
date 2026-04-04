@@ -40,12 +40,17 @@ export default function InsurerDashboard() {
     navigate('/')
   }
 
+  const [prevPolicies, setPrevPolicies] = useState<number | null>(null)
+
   useEffect(() => {
-    // Simulate new rider signup 2.5 seconds after mounting
-    const timer = setTimeout(() => setShowToast(true), 2500)
-    const cleanup = setTimeout(() => setShowToast(false), 8000)
-    return () => { clearTimeout(timer); clearTimeout(cleanup) }
-  }, [])
+    if (stats?.active_policies !== undefined) {
+      if (prevPolicies !== null && stats.active_policies > prevPolicies) {
+        setShowToast(true)
+        setTimeout(() => setShowToast(false), 8000)
+      }
+      setPrevPolicies(stats.active_policies)
+    }
+  }, [stats])
 
   useEffect(() => {
     const fetchStats = () => {
