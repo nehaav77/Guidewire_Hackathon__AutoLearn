@@ -22,6 +22,43 @@ services:
     restart: unless-stopped
     command: redis-server --save 60 1 --loglevel warning
 
+  backend:
+    build: ./backend
+    container_name: shieldride_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGODB_URL=mongodb://mongodb:27017
+      - REDIS_URL=redis://redis:6379/0
+      - ENVIRONMENT=production
+    depends_on:
+      - mongodb
+      - redis
+    restart: unless-stopped
+
+  celery_worker:
+    build: ./backend
+    container_name: shieldride_celery
+    command: celery -A celery_app worker --pool=solo --loglevel=info
+    environment:
+      - MONGODB_URL=mongodb://mongodb:27017
+      - REDIS_URL=redis://redis:6379/0
+      - ENVIRONMENT=production
+    depends_on:
+      - mongodb
+      - redis
+      - backend
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: shieldride_frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
 volumes:
   mongodb_data:
   redis_data:
